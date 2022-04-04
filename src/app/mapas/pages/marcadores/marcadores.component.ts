@@ -1,6 +1,12 @@
 import { AfterViewInit, Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import * as mapboxgl from 'mapbox-gl';
 
+interface MacadorColor {
+  color   : string;
+  marker?  : mapboxgl.Marker;
+  centro?  : [number, number]
+}
+
 @Component({
   selector: 'app-marcadores',
   templateUrl: './marcadores.component.html',
@@ -11,15 +17,17 @@ import * as mapboxgl from 'mapbox-gl';
       width: 100%;
     }
 
-    .row {
-      background-color: white;
-      border-radius: 5px;
-      bottom: 50px;
-      left: 50px;
+    .list-group {
       position: fixed;
-
-      z-index: 999;
+      top: 20px;
+      right: 20px;
+      z-index: 99;
     }
+
+    li {
+      cursor: pointer;
+    }
+
     `
   ]
 })
@@ -29,6 +37,8 @@ export class MarcadoresComponent implements OnInit, AfterViewInit {
   mapa!: mapboxgl.Map;
   zoomLevel: number = 15;
   center: [number, number] =[-74.158762, 4.646581];
+
+  marcadores: MacadorColor[] = [];
 
 
 
@@ -50,9 +60,102 @@ export class MarcadoresComponent implements OnInit, AfterViewInit {
       //   .setLngLat( this.center )
       //   .addTo(this.mapa);
 
+      this.leerLocalStorage();
+
     }
 
   ngOnInit(): void {
+  }
+
+  agregarMarcador() {
+
+    const color = "#xxxxxx".replace(/x/g, y=>(Math.random()*16|0).toString(16));
+
+    const nuevoMarcador = new mapboxgl.Marker({
+      draggable: true,
+      color
+    })
+      .setLngLat( this.center )
+      .addTo( this.mapa );
+
+      this.marcadores.push( {
+        color,
+        marker: nuevoMarcador
+      } );
+
+      this.guardarMacadoresLocalStorage()
+
+      nuevoMarcador.on('dragend', () => {
+        this.guardarMacadoresLocalStorage();
+      });
+  }
+
+  irMarcador( marker: mapboxgl.Marker ){
+    this.mapa.flyTo({
+      center: marker.getLngLat()
+    })
+  }
+
+  guardarMacadoresLocalStorage(){
+
+    const lngLatArr: MacadorColor[]= []
+
+    this.marcadores.forEach( m => {
+      const color = m.color;
+      const { lng, lat  } = m.marker!.getLngLat()
+
+      lngLatArr.push({
+        color:color,
+        centro: [lng, lat]
+      });
+    })
+
+    localStorage.setItem('marcadores', JSON.stringify(lngLatArr))
+  }
+
+  leerLocalStorage(){
+    if( !localStorage.getItem('marcadores') )
+    {
+      return;
+    }
+
+    const lngLatArr: MacadorColor[] = JSON.parse(localStorage.getItem('marcadores')! );
+
+    lngLatArr.forEach( m => {
+
+      const newMarker = new mapboxgl.Marker({
+        color     : m.color,
+        draggable : true
+      })
+        .setLngLat( m.centro! )
+        .addTo( this.mapa )
+
+
+        this.marcadores.push({
+          marker: newMarker,
+          color: m.color
+        });
+
+
+        newMarker.on('dragend', () => {
+          this.guardarMacadoresLocalStorage();
+        });
+
+    });
+
+
+
+  }
+
+  borrarMarcador( i: number ){
+
+    console.log('Borrar');
+
+
+    this.marcadores[i].marker?.remove();
+    this.marcadores.splice(i, 1);
+    this.guardarMacadoresLocalStorage();
+
   }
 
 }
